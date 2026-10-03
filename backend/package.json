@@ -1,0 +1,30 @@
+{
+  "name": "expense-ai-backend",
+  "version": "1.0.0",
+  "description": "Backend API for ExpenseAI Monthly Tracker with Ollama and MongoDB",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "expense-tracker",
+    "ai",
+    "ollama",
+    "express",
+    "mongodb"
+  ],
+  "author": "Antigravity AI",
+  "license": "MIT",
+  "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.70.0",
+    "@google/genai": "^2.27.0",
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "elevenlabs": "^1.59.0",
+    "express": "^4.21.1",
+    "mongoose": "^8.7.1",
+    "multer": "^2.4.0"
+  }
+}
