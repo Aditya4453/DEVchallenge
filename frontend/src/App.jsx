@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import LoadingScreen from './components/LoadingScreen';
 import Header from './components/Header';
 import HeroInput from './components/HeroInput';
@@ -6,13 +6,15 @@ import SummaryCards from './components/SummaryCards';
 import CategoryChart from './components/CategoryChart';
 import TransactionList from './components/TransactionList';
 import ToastNotification from './components/ToastNotification';
-import { 
-  parseExpense, fetchExpenses, deleteExpense, playVoiceFeedback 
-} from './services/api';
+import { parseExpense, fetchExpenses, deleteExpense } from './services/api';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
+];
+const CATEGORY_OPTIONS = [
+  'All', 'Food & Dining', 'Shopping', 'Transport', 'Bills & Utilities',
+  'Entertainment', 'Income', 'Other'
 ];
 
 export default function App() {
@@ -20,12 +22,35 @@ export default function App() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [expenses, setExpenses] = useState([]);
-  const [voiceEnabled, setVoiceEnabled] = useState(() => {
-    return localStorage.getItem('expenseai_voice_enabled') !== 'false';
-  });
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [sortBy, setSortBy] = useState('newest');
   const [isParsing, setIsParsing] = useState(false);
-  const [isSpeakingSummary, setIsSpeakingSummary] = useState(false);
   const [toasts, setToasts] = useState([]);
+
+  const filteredExpenses = useMemo(() => {
+    const filtered = selectedCategory === 'All'
+      ? expenses
+      : expenses.filter((item) => (item.category || 'Other') === selectedCategory);
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'amount-high') return Number(b.amount) - Number(a.amount);
+      if (sortBy === 'amount-low') return Number(a.amount) - Number(b.amount);
+
+      const dateDifference = new Date(b.date).getTime() - new Date(a.date).getTime();
+      return sortBy === 'oldest' ? -dateDifference : dateDifference;
+    });
+  }, [expenses, selectedCategory, sortBy]);
+
+  const filteredTotals = useMemo(() => {
+    const totals = filteredExpenses.reduce((result, item) => {
+      const amount = Number(item.amount);
+      if (item.type === 'income') result.totalIncome += amount;
+      else result.totalSpent += amount;
+      return result;
+    }, { totalSpent: 0, totalIncome: 0 });
+
+    return { ...totals, netBalance: totals.totalIncome - totals.totalSpent };
+  }, [filteredExpenses]);
 
   // Toast Helper
   const addToast = (message, type = 'info') => {
@@ -34,16 +59,6 @@ export default function App() {
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3200);
-  };
-
-  // Toggle Voice Audio
-  const handleVoiceToggle = () => {
-    setVoiceEnabled((prev) => {
-      const next = !prev;
-      localStorage.setItem('expenseai_voice_enabled', next);
-      addToast(`Voice feedback ${next ? 'Enabled' : 'Muted'}`, 'info');
-      return next;
-    });
   };
 
   // Fetch Expenses
@@ -82,16 +97,6 @@ export default function App() {
         const updatedList = updatedRes.data || [];
         setExpenses(updatedList);
 
-        // Calculate Totals for Audio Feedback
-        let currentSpent = 0;
-        updatedList.filter((e) => e.type === 'expense').forEach((e) => currentSpent += Number(e.amount));
-
-        const monthName = MONTH_NAMES[selectedMonth - 1];
-        const audioFeedback = item.type === 'income'
-          ? `Received ${item.amount} rupees income from ${item.merchant}.`
-          : `Added ${item.amount} rupees for ${item.merchant} under ${item.category}. Your total spending for ${monthName} is now ${currentSpent} rupees.`;
-
-        playVoiceFeedback(audioFeedback, voiceEnabled);
       }
     } catch (err) {
       console.error('Add expense error:', err);
@@ -115,46 +120,6 @@ export default function App() {
     }
   };
 
-  // Handle ElevenLabs Listen Summary Audio Playback
-  const handleListenSummary = () => {
-    const monthName = MONTH_NAMES[selectedMonth - 1];
-
-    if (expenses.length === 0) {
-      const emptyMsg = `No transactions recorded for ${monthName} ${selectedYear}.`;
-      addToast(emptyMsg, 'info');
-      playVoiceFeedback(emptyMsg, voiceEnabled);
-      return;
-    }
-
-    let totalSpent = 0;
-    let totalIncome = 0;
-
-    expenses.forEach((item) => {
-      if (item.type === 'income') totalIncome += Number(item.amount);
-      else totalSpent += Number(item.amount);
-    });
-
-    const netBalance = totalIncome - totalSpent;
-    const reportText = `In ${monthName} ${selectedYear}, your total income was ${totalIncome} rupees and total spending was ${totalSpent} rupees across ${expenses.length} transactions. Your net balance is ${netBalance} rupees.`;
-
-    setIsSpeakingSummary(true);
-    addToast('Playing monthly audio summary', 'info');
-    playVoiceFeedback(reportText, voiceEnabled);
-
-    setTimeout(() => {
-      setIsSpeakingSummary(false);
-    }, 4500);
-  };
-
-  // Compute Totals
-  let totalSpent = 0;
-  let totalIncome = 0;
-  expenses.forEach((item) => {
-    if (item.type === 'income') totalIncome += Number(item.amount);
-    else totalSpent += Number(item.amount);
-  });
-  const netBalance = totalIncome - totalSpent;
-
   return (
     <>
       {/* 1. Full-screen Loading Screen */}
@@ -173,8 +138,6 @@ export default function App() {
           selectedYear={selectedYear}
           onMonthChange={setSelectedMonth}
           onYearChange={setSelectedYear}
-          voiceEnabled={voiceEnabled}
-          onVoiceToggle={handleVoiceToggle}
         />
 
         {/* Hero Natural Language Prompt Section */}
@@ -183,30 +146,67 @@ export default function App() {
           isLoading={isParsing}
         />
 
+        <section className="mb-8 flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-neutral-400">Category</span>
+            {CATEGORY_OPTIONS.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setSelectedCategory(category)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  selectedCategory === category
+                    ? 'border-indigo-400/50 bg-indigo-500/20 text-indigo-200'
+                    : 'border-white/10 bg-white/5 text-neutral-400 hover:border-white/20 hover:text-neutral-200'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+            Sort
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+              className="rounded-lg border border-white/10 bg-[#111] px-3 py-2 text-xs font-medium normal-case tracking-normal text-neutral-200 outline-none focus:border-indigo-400/50"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="amount-high">Amount: high to low</option>
+              <option value="amount-low">Amount: low to high</option>
+            </select>
+          </label>
+        </section>
+
         {/* Monthly Financial Summary Cards */}
         <SummaryCards 
-          totalSpent={totalSpent}
-          totalIncome={totalIncome}
-          netBalance={netBalance}
+          totalSpent={filteredTotals.totalSpent}
+          totalIncome={filteredTotals.totalIncome}
+          netBalance={filteredTotals.netBalance}
         />
 
         {/* Main Content Grid: Chart & Transactions */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <section className="lg:col-span-5">
             <CategoryChart 
-              expenses={expenses}
-              totalSpent={totalSpent}
-              onListenSummary={handleListenSummary}
-              isSpeaking={isSpeakingSummary}
+              expenses={filteredExpenses}
+              totalSpent={filteredTotals.totalSpent}
+              selectedCategory={selectedCategory}
+              sortBy={sortBy}
+              monthName={MONTH_NAMES[selectedMonth - 1]}
+              year={selectedYear}
             />
           </section>
 
           <section className="lg:col-span-7">
             <TransactionList 
-              expenses={expenses}
+              expenses={filteredExpenses}
               onDelete={handleDeleteExpense}
               monthName={MONTH_NAMES[selectedMonth - 1]}
               year={selectedYear}
+              selectedCategory={selectedCategory}
+              sortBy={sortBy}
             />
           </section>
         </div>
@@ -214,7 +214,7 @@ export default function App() {
         {/* Footer */}
         <footer className="mt-16 text-center text-xs text-neutral-500 py-6 border-t border-white/10 font-sans">
           <p className="mb-1">Build for a Friend • <strong className="text-neutral-400">Hacktoberfest DEV Challenge</strong></p>
-          <p className="text-neutral-600 font-mono text-[11px]">ExpenseAI — React, Framer Motion & ElevenLabs Voice</p>
+          <p className="text-neutral-600 font-mono text-[11px]">ExpenseAI — React, Framer Motion & Local AI</p>
         </footer>
       </div>
 

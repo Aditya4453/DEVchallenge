@@ -1,13 +1,11 @@
 import React from 'react';
-import { Calendar, Volume2, VolumeX, AudioLines } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 
 export default function Header({
   selectedMonth,
   selectedYear,
   onMonthChange,
-  onYearChange,
-  voiceEnabled,
-  onVoiceToggle
+  onYearChange
 }) {
   return (
     <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 mb-10 border-b border-white/10">
@@ -21,35 +19,13 @@ export default function Header({
             <h1 className="text-2xl font-heading font-bold tracking-tight text-[#FCFBF9]">
               Expense<span className="text-xs tracking-[0.05em] uppercase font-semibold text-neutral-400 ml-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 font-sans">AI</span>
             </h1>
-            <span className="px-2 py-0.5 text-[10px] font-mono tracking-[0.05em] uppercase bg-white/5 text-neutral-300 border border-white/10 rounded flex items-center gap-1">
-              <AudioLines className="w-3 h-3 text-indigo-400" /> ElevenLabs Voice
-            </span>
           </div>
-          <p class="text-xs text-neutral-400 font-sans tracking-normal mt-0.5">Private monthly financial intelligence powered by open-source AI & ElevenLabs TTS</p>
+          <p className="text-xs text-neutral-400 font-sans tracking-normal mt-0.5">Private monthly financial intelligence powered by open-source AI</p>
         </div>
       </div>
 
-      {/* CONTROLS: VOICE TOGGLE & MONTH SELECTOR */}
+      {/* CONTROLS: MONTH SELECTOR */}
       <div className="flex items-center gap-3">
-        {/* VOICE MUTE / UNMUTE TOGGLE */}
-        <button 
-          type="button" 
-          onClick={onVoiceToggle}
-          title="Toggle Voice Feedback Audio"
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition border ${
-            voiceEnabled 
-              ? 'bg-[#121212] border-emerald-500/30 text-emerald-300' 
-              : 'bg-[#121212] border-white/10 text-neutral-400 opacity-80'
-          }`}
-        >
-          {voiceEnabled ? (
-            <Volume2 className="w-4 h-4 text-emerald-400" />
-          ) : (
-            <VolumeX className="w-4 h-4 text-neutral-400" />
-          )}
-          <span className="font-sans">{voiceEnabled ? 'Voice ON' : 'Voice OFF'}</span>
-        </button>
-
         {/* MONTH & YEAR SELECTOR DROPDOWN */}
         <div className="flex items-center gap-2 bg-[#121212] border border-white/10 px-3 py-1.5 rounded-lg shadow-sm">
           <Calendar className="w-3.5 h-3.5 text-neutral-400" />

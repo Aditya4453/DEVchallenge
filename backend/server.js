@@ -100,42 +100,90 @@ function fallbackParseTransaction(text) {
 }
 
 // AI Parsing logic using Ollama gemma2:2b
+
 async function parseWithOllama(text) {
-  const prompt = `You are a precise JSON parsing API for a personal expense tracker.
-Analyze the user's input: "${text}"
+  // 1. Enforce exact schema structure and keys
+  const jsonSchema = {
+    type: "object",
+    properties: {
+      amount: { type: "number" },
+      category: { 
+        type: "string",
+        enum: [
+          "Food & Dining", 
+          "Shopping", 
+          "Transport", 
+          "Bills & Utilities", 
+          "Entertainment", 
+          "Health & Wellness", 
+          "Income", 
+          "Other"
+        ]
+      },
+      merchant: { type: "string" },
+      type: { type: "string", enum: ["expense", "income"] }
+    },
+    required: ["amount", "category", "merchant", "type"]
+  };
 
-Extract the transaction data and return ONLY a valid JSON object matching this structure:
-{
-  "amount": Number,
-  "category": String (Must be ONE of: "Food & Dining", "Shopping", "Transport", "Bills & Utilities", "Entertainment", "Income", "Other"),
-  "merchant": String (The vendor/store/person/company name),
-  "type": "expense" or "income"
-}
+  // 2. Strict system prompt with INR conversion context
+  const systemPrompt = `You are an Indian financial expense parser.
+Extract transaction details from the user input into JSON format.
 
-Do not include any Markdown, explanations, or backticks. Return RAW JSON ONLY.`;
+USER INPUT: "${text}"
+
+NUMBER CONVERSION RULES:
+- Context is Indian Rupees (INR).
+- "four fifty" -> 450 (NOT 4.50 or 45)
+- "four hundred fifty" -> 450
+- "fifteen hundred" -> 1500
+- "two thousand" -> 2000
+
+CATEGORY CLASSIFICATION RULES:
+- Food & Dining: coffee, tea, restaurant, snacks, Zomato, Swiggy, CCD, McDonald's
+- Shopping: clothes, shoes, Amazon, Flipkart, electronics, groceries
+- Transport: Uber, Ola, cab, petrol, fuel, parking, metro, auto, bike
+- Bills & Utilities: electricity, wifi, recharge, rent, water, mobile bill
+- Entertainment: movies, games, concert, Netflix, BookMyShow
+- Health & Wellness: medicines, doctor, gym, hospital
+- Income: salary, stipend, cashback, refund, freelance payment
+- Other: ONLY if the input is completely non-financial or unrecognizable.
+
+If merchant is not explicitly mentioned, infer it from the item (e.g. "coffee", "cab", "bike").`;
 
   try {
-    const response = await axios.post(`${OLLAMA_HOST}/api/generate`, {
-      model: OLLAMA_MODEL,
-      prompt: prompt,
-      stream: false,
-      format: 'json'
-    }, { timeout: 6000 });
+    const response = await fetch(`${process.env.OLLAMA_HOST || 'http://localhost:11434'}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: process.env.OLLAMA_MODEL || 'llama3.2',
+        prompt: systemPrompt,
+        format: jsonSchema, // ENFORCES STRICT KEYS AT SAMPLER LEVEL
+        stream: false,
+        options: {
+          temperature: 0 // Eliminates randomness
+        }
+      }),
+      signal: AbortSignal.timeout(30000) // 30s timeout for cold starts
+    });
 
-    if (response.data && response.data.response) {
-      let parsed = JSON.parse(response.data.response);
-      return {
-        amount: Number(parsed.amount) || 0,
-        category: parsed.category || 'Other',
-        merchant: parsed.merchant || 'General',
-        type: (parsed.type === 'income' || parsed.type === 'expense') ? parsed.type : 'expense'
-      };
-    }
-  } catch (error) {
-    console.warn(`[Ollama AI] Notice: Ollama model query failed (${error.message}). Using fallback heuristic parser.`);
+    const data = await response.json();
+    const rawParsed = JSON.parse(data.response.trim());
+
+    // 3. Type sanitization to guarantee valid numbers
+    const numAmount = Number(rawParsed.amount);
+    
+    return {
+      amount: !isNaN(numAmount) && numAmount > 0 ? numAmount : 0,
+      category: rawParsed.category || "Other",
+      merchant: rawParsed.merchant || "General",
+      type: rawParsed.type === "income" ? "income" : "expense"
+    };
+
+  } catch (err) {
+    console.warn('Ollama local parsing failed or timed out, running heuristic fallback:', err.message);
+    return fallbackHeuristicParser(text);
   }
-
-  return fallbackParseTransaction(text);
 }
 
 // ------------------- ROUTES -------------------

@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Utensils, ShoppingBag, Car, Zap, Film, ArrowDownLeft, Tag, Trash2, Receipt 
+  Utensils, ShoppingBag, Car, Zap, Film, ArrowDownLeft, Tag, Trash2, Receipt, Download
 } from 'lucide-react';
 import { getCategoryBadgeStyle, getCategoryHex } from '../lib/categoryColors';
 
@@ -16,7 +16,32 @@ const CATEGORY_ICONS = {
   'Other':            Tag,
 };
 
-export default function TransactionList({ expenses, onDelete, monthName, year }) {
+function exportTransactions(expenses, selectedCategory, monthName, year, sortBy) {
+  const escapeCell = (value) => String(value ?? '').replace(/"/g, '""');
+  const rows = [
+    ['Date', 'Merchant', 'Category', 'Type', 'Amount'],
+    ...expenses.map((item) => [
+      new Date(item.date).toLocaleDateString('en-IN'),
+      item.merchant || 'General',
+      item.category || 'Other',
+      item.type,
+      Number(item.amount).toFixed(2)
+    ])
+  ];
+  const csv = rows.map((row) => row.map((cell) => `"${escapeCell(cell)}"`).join(',')).join('\r\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const filenamePart = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `transactions-${filenamePart(selectedCategory)}-${filenamePart(monthName)}-${year}-${filenamePart(sortBy)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export default function TransactionList({
+  expenses, onDelete, monthName, year, selectedCategory, sortBy
+}) {
   return (
     <div className="vercel-card p-6 rounded-xl border border-white/10 flex flex-col h-full">
       {/* SECTION HEADER */}
@@ -25,9 +50,20 @@ export default function TransactionList({ expenses, onDelete, monthName, year })
           <h3 className="text-xl font-heading font-bold text-[#FCFBF9]">Monthly Transactions</h3>
           <p className="text-xs text-neutral-400 font-sans">Sorted newest first for selected month</p>
         </div>
-        <span className="px-2.5 py-1 rounded bg-white/5 border border-white/10 text-[10px] font-mono uppercase tracking-[0.05em] text-neutral-300">
-          {expenses.length} {expenses.length === 1 ? 'Entry' : 'Entries'}
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => exportTransactions(expenses, selectedCategory, monthName, year, sortBy)}
+            disabled={expenses.length === 0}
+            title="Export transactions to Excel-compatible CSV"
+            className="rounded border border-white/10 bg-white/5 p-1.5 text-neutral-400 transition hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <Download className="h-3.5 w-3.5" />
+          </button>
+          <span className="px-2.5 py-1 rounded bg-white/5 border border-white/10 text-[10px] font-mono uppercase tracking-[0.05em] text-neutral-300">
+            {expenses.length} {expenses.length === 1 ? 'Entry' : 'Entries'}
+          </span>
+        </div>
       </div>
 
       {/* TRANSACTION ITEMS CONTAINER */}

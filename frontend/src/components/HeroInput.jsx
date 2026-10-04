@@ -35,12 +35,12 @@ export default function HeroInput({ onSubmit, isLoading }) {
               Ollama Gemma 2 Local Model
             </span>
             <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded">
-              <Mic className="w-3 h-3" /> ElevenLabs Multilingual V2
+              <Mic className="w-3 h-3" /> Natural Language Input
             </span>
           </div>
 
           <span className="text-[11px] font-mono text-neutral-400 border border-white/10 px-2 py-0.5 rounded">
-            Private & Voice Ready
+            Private & AI Ready
           </span>
         </div>
 
@@ -49,7 +49,7 @@ export default function HeroInput({ onSubmit, isLoading }) {
           Natural Language Expense Input
         </h2>
         <p className="text-sm text-neutral-400 mb-6 leading-relaxed font-sans">
-          Type transaction updates in natural English or Hinglish. AI will extract details, and ElevenLabs will speak confirmation feedback.
+          Type transaction updates in natural English or Hinglish. AI will extract the transaction details.
         </p>
 
         {/* FORM INPUT */}

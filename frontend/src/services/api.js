@@ -47,34 +47,3 @@ export async function deleteExpense(id) {
     throw err.response?.data?.error || 'Failed to delete transaction.';
   }
 }
-
-/**
- * ElevenLabs Text-to-Speech audio player with Web Speech fallback
- */
-export async function playVoiceFeedback(text, voiceEnabled = true) {
-  if (!voiceEnabled || !text) return;
-
-  try {
-    const res = await client.post('/text-to-speech', { text }, { responseType: 'arraybuffer' });
-    const contentType = res.headers['content-type'];
-    
-    if (res.status === 200 && contentType && contentType.includes('audio/mpeg')) {
-      const audioBlob = new Blob([res.data], { type: 'audio/mpeg' });
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      await audio.play();
-      return;
-    }
-  } catch (err) {
-    console.warn('ElevenLabs API Audio notice, executing Web Speech fallback:', err.message);
-  }
-
-  // Web Speech API Native Browser Fallback
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    window.speechSynthesis.speak(utterance);
-  }
-}

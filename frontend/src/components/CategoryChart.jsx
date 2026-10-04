@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
-import { Volume2 } from 'lucide-react';
+import { Download } from 'lucide-react';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -15,7 +15,10 @@ const CATEGORY_CONFIG = {
   'Other': { color: '#9ca3af' }
 };
 
-export default function CategoryChart({ expenses, totalSpent, onListenSummary, isSpeaking }) {
+export default function CategoryChart({
+  expenses, totalSpent, selectedCategory, monthName, year
+}) {
+  const chartRef = useRef(null);
   // Aggregate expenses by category
   const categoryTotals = {};
   expenses.filter(e => e.type === 'expense').forEach(item => {
@@ -60,6 +63,76 @@ export default function CategoryChart({ expenses, totalSpent, onListenSummary, i
     }
   };
 
+  const exportChart = (format) => {
+    const chartCanvas = chartRef.current?.canvas;
+    if (!chartCanvas) return;
+
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = 800;
+    exportCanvas.height = 560 + labels.length * 28;
+    const context = exportCanvas.getContext('2d');
+    if (!context) return;
+
+    context.fillStyle = '#111111';
+    context.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    context.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    context.lineWidth = 1;
+    for (let x = 0; x < exportCanvas.width; x += 48) {
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, exportCanvas.height);
+      context.stroke();
+    }
+    for (let y = 0; y < exportCanvas.height; y += 48) {
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(exportCanvas.width, y);
+      context.stroke();
+    }
+
+    const chartSize = 470;
+    context.drawImage(chartCanvas, (exportCanvas.width - chartSize) / 2, 24, chartSize, chartSize);
+    context.textAlign = 'center';
+    context.fillStyle = '#9ca3af';
+    context.font = '600 16px Arial';
+    context.fillText('SPENT', 400, 245);
+    context.fillStyle = '#f5f5f5';
+    context.font = '700 27px Arial';
+    context.fillText(`₹${totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`, 400, 278);
+    context.textAlign = 'left';
+    context.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    context.beginPath();
+    context.moveTo(0, 500);
+    context.lineTo(exportCanvas.width, 500);
+    context.stroke();
+
+    context.font = '600 20px Arial';
+    labels.forEach((label, index) => {
+      const y = 540 + index * 28;
+      const amount = categoryTotals[label];
+      const percentage = totalSpent > 0 ? ((amount / totalSpent) * 100).toFixed(1) : 0;
+      context.fillStyle = backgroundColors[index];
+      context.beginPath();
+      context.arc(18, y - 6, 6, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = '#f5f5f5';
+      context.fillText(label, 34, y);
+      context.fillStyle = '#9ca3af';
+      context.textAlign = 'right';
+      context.fillText(`${percentage}%`, 700, y);
+      context.fillStyle = '#f5f5f5';
+      context.fillText(`₹${amount.toLocaleString('en-IN')}`, 780, y);
+      context.textAlign = 'left';
+    });
+
+    const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+    const link = document.createElement('a');
+    const filenamePart = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    link.href = exportCanvas.toDataURL(mimeType, 0.95);
+    link.download = `category-breakdown-${filenamePart(selectedCategory)}-${filenamePart(monthName)}-${year}.${format}`;
+    link.click();
+  };
+
   return (
     <div className="vercel-card p-6 rounded-xl border border-white/10 h-full flex flex-col justify-between">
       <div>
@@ -68,24 +141,26 @@ export default function CategoryChart({ expenses, totalSpent, onListenSummary, i
             <h3 className="text-xl font-heading font-bold text-[#FCFBF9]">Category Breakdown</h3>
             <p className="text-xs text-neutral-400 font-sans">Monthly expense distributions</p>
           </div>
-
-          {/* LISTEN SUMMARY AUDIO BUTTON */}
-          <button 
-            type="button" 
-            onClick={onListenSummary}
-            title="Read Monthly Financial Summary with ElevenLabs Voice"
-            className={`flex items-center gap-1.5 px-3 py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold transition group ${
-              isSpeaking ? 'animate-pulse' : ''
-            }`}
-          >
-            <Volume2 className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition" />
-            <span className="font-sans">{isSpeaking ? 'Speaking...' : 'Listen Summary'}</span>
-          </button>
+          <div className="flex items-center gap-1">
+            <Download className="mr-1 h-3.5 w-3.5 text-neutral-500" />
+            {['png', 'jpg'].map((format) => (
+              <button
+                key={format}
+                type="button"
+                onClick={() => exportChart(format)}
+                disabled={labels.length === 0}
+                title={`Export chart as ${format.toUpperCase()}`}
+                className="rounded border border-white/10 bg-white/5 px-1.5 py-1 text-[9px] font-semibold uppercase text-neutral-400 transition hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                {format}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* DOUGHNUT CHART CONTAINER */}
         <div className="relative w-full max-w-[240px] mx-auto aspect-square my-4">
-          <Doughnut data={chartData} options={chartOptions} />
+          <Doughnut ref={chartRef} data={chartData} options={chartOptions} />
           {/* Center Overlay Text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
             <span className="text-[10px] uppercase tracking-[0.05em] font-semibold text-neutral-400 font-sans">Spent</span>
