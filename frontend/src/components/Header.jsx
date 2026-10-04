@@ -1,11 +1,14 @@
 import React from 'react';
 import { Calendar } from 'lucide-react';
+import ImportModal from './ImportModal';
 
 export default function Header({
   selectedMonth,
   selectedYear,
   onMonthChange,
-  onYearChange
+  onYearChange,
+  onImport,
+  onImportError
 }) {
   return (
     <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 mb-10 border-b border-white/10">
@@ -26,6 +29,7 @@ export default function Header({
 
       {/* CONTROLS: MONTH SELECTOR */}
       <div className="flex items-center gap-3">
+        <ImportModal onImport={onImport} onError={onImportError} />
         {/* MONTH & YEAR SELECTOR DROPDOWN */}
         <div className="flex items-center gap-2 bg-[#121212] border border-white/10 px-3 py-1.5 rounded-lg shadow-sm">
           <Calendar className="w-3.5 h-3.5 text-neutral-400" />

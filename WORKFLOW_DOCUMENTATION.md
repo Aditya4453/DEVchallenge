@@ -15,7 +15,7 @@ ExpenseAI is an open-source, monthly personal finance assistant engineered for z
                                                                      |
                                                                      v
 +------------------+         +------------------+         +----------------------+
-| Monthly Dashboard|         |  MongoDB Atlas   |         | Strict JSON Parser   |
+| Monthly Dashboard|         | In-Memory Store  |         | Strict JSON Parser   |
 | Card & Chart.js  | <------ |  Cluster Store   | <------ | & Validation Layer   |
 | View Updates     |         |  Expense Model   |         | (Amount, Category...) |
 +------------------+         +------------------+         +----------------------+
@@ -35,7 +35,7 @@ ExpenseAI is an open-source, monthly personal finance assistant engineered for z
 3. **Local LLM Query (Ollama / Gemma 2 2B):**
    Express constructs a strict system prompt instructing Ollama (`gemma2:2b`) to parse entity details into structured JSON.
 4. **Validation & Persistence:**
-   Backend validates input fields, attaches target date, creates Mongoose document in MongoDB Atlas, and returns saved record.
+   Backend validates input fields, attaches the target date, stores the record in memory, and returns it.
 5. **Dynamic Dashboard & ElevenLabs Voice Feedback:**
    - Frontend updates summary cards, Chart.js doughnut chart, and transaction list.
    - Generates verbal confirmation string (e.g., *"Added 450 rupees for CCD under Food & Dining. Total spending is now 2,100 rupees."*).

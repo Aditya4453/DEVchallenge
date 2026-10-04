@@ -16,16 +16,48 @@ const CATEGORY_OPTIONS = [
   'All', 'Food & Dining', 'Shopping', 'Transport', 'Bills & Utilities',
   'Entertainment', 'Income', 'Other'
 ];
+const TRANSACTIONS_STORAGE_KEY = 'expenseai_transactions';
+
+function readStoredTransactions() {
+  try {
+    const stored = localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
+    const parsed = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error('Failed to read local transactions:', err);
+    return [];
+  }
+}
+
+function writeStoredTransactions(transactions) {
+  try {
+    localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
+  } catch (err) {
+    console.error('Failed to persist local transactions:', err);
+  }
+}
+
+function isInMonth(transaction, month, year) {
+  const date = new Date(transaction.date);
+  return date.getMonth() + 1 === month && date.getFullYear() === year;
+}
 
 export default function App() {
   const [isLoadingScreen, setIsLoadingScreen] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [expenses, setExpenses] = useState([]);
+  const [expenses, setExpenses] = useState(() => readStoredTransactions());
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
   const [isParsing, setIsParsing] = useState(false);
   const [toasts, setToasts] = useState([]);
+
+  const availableCategories = useMemo(() => (
+    [...new Set([
+      ...CATEGORY_OPTIONS,
+      ...expenses.map((item) => item.category || 'Other')
+    ])]
+  ), [expenses]);
 
   const filteredExpenses = useMemo(() => {
     const filtered = selectedCategory === 'All'
@@ -63,14 +95,22 @@ export default function App() {
 
   // Fetch Expenses
   const loadExpenses = useCallback(async (month, year) => {
+    const storedExpenses = readStoredTransactions();
     try {
       const res = await fetchExpenses(month, year);
       if (res.success) {
-        setExpenses(res.data || []);
+        const apiExpenses = res.data || [];
+        const apiIds = new Set(apiExpenses.map((expense) => expense._id));
+        const mergedExpenses = [
+          ...storedExpenses.filter((expense) => !apiIds.has(expense._id)),
+          ...apiExpenses
+        ];
+        writeStoredTransactions(mergedExpenses);
+        setExpenses(mergedExpenses.filter((expense) => isInMonth(expense, month, year)));
       }
     } catch (err) {
       console.error('Error loading expenses:', err);
-      setExpenses([]);
+      setExpenses(storedExpenses.filter((expense) => isInMonth(expense, month, year)));
     }
   }, []);
 
@@ -95,7 +135,14 @@ export default function App() {
         // Refresh List
         const updatedRes = await fetchExpenses(selectedMonth, selectedYear);
         const updatedList = updatedRes.data || [];
-        setExpenses(updatedList);
+        const storedExpenses = readStoredTransactions();
+        const apiIds = new Set(updatedList.map((expense) => expense._id));
+        const mergedExpenses = [
+          ...storedExpenses.filter((expense) => !apiIds.has(expense._id)),
+          ...updatedList
+        ];
+        writeStoredTransactions(mergedExpenses);
+        setExpenses(mergedExpenses.filter((expense) => isInMonth(expense, selectedMonth, selectedYear)));
 
       }
     } catch (err) {
@@ -112,12 +159,28 @@ export default function App() {
       const res = await deleteExpense(id);
       if (res.success) {
         addToast('Transaction removed', 'info');
+        const remainingExpenses = readStoredTransactions().filter((expense) => expense._id !== id);
+        writeStoredTransactions(remainingExpenses);
         loadExpenses(selectedMonth, selectedYear);
       }
     } catch (err) {
       console.error('Delete expense error:', err);
       addToast('Failed to delete expense', 'error');
     }
+  };
+
+  const handleImport = (rows) => {
+    const importedExpenses = rows.map((row, index) => ({
+      ...row,
+      _id: `import_${Date.now()}_${index}`,
+      rawInput: 'Imported transaction',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }));
+    const mergedExpenses = [...readStoredTransactions(), ...importedExpenses];
+    writeStoredTransactions(mergedExpenses);
+    setExpenses(mergedExpenses.filter((expense) => isInMonth(expense, selectedMonth, selectedYear)));
+    addToast(`Imported ${importedExpenses.length} transaction${importedExpenses.length === 1 ? '' : 's'}`, 'success');
   };
 
   return (
@@ -138,6 +201,8 @@ export default function App() {
           selectedYear={selectedYear}
           onMonthChange={setSelectedMonth}
           onYearChange={setSelectedYear}
+          onImport={handleImport}
+          onImportError={(message) => addToast(message, 'error')}
         />
 
         {/* Hero Natural Language Prompt Section */}
@@ -149,7 +214,7 @@ export default function App() {
         <section className="mb-8 flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-neutral-400">Category</span>
-            {CATEGORY_OPTIONS.map((category) => (
+            {availableCategories.map((category) => (
               <button
                 key={category}
                 type="button"

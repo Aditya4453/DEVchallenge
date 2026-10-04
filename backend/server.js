@@ -1,10 +1,8 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const axios = require('axios');
 const dotenv = require('dotenv');
 const path = require('path');
-const Expense = require('./models/Expense');
 
 dotenv.config();
 
@@ -30,25 +28,7 @@ if (fs.existsSync(frontendDistPath)) {
 const PORT = process.env.PORT || 5000;
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma2:2b';
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/expenses';
-
-// In-Memory fallback storage if MongoDB is not available
-let isMongoConnected = false;
 let inMemoryExpenses = [];
-
-// Connect to MongoDB Atlas / Local MongoDB
-mongoose.connect(MONGODB_URI, {
-  serverSelectionTimeoutMS: 5000
-})
-.then(() => {
-  isMongoConnected = true;
-  console.log('✅ MongoDB Connected successfully.');
-})
-.catch((err) => {
-  isMongoConnected = false;
-  console.warn('⚠️ MongoDB connection failed. Operating with in-memory storage mode.');
-  console.warn('   Reason:', err.message);
-});
 
 // Heuristic Fallback Parser for local offline execution when Ollama is unavailable
 function fallbackParseTransaction(text) {
@@ -222,21 +202,14 @@ app.post('/api/parse-expense', async (req, res) => {
       date: transactionDate
     };
 
-    if (isMongoConnected) {
-      const expense = new Expense(newExpensePayload);
-      const savedExpense = await expense.save();
-      return res.status(201).json({ success: true, data: savedExpense });
-    } else {
-      // In-Memory Storage Fallback
-      const mockExpense = {
-        _id: 'mem_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-        ...newExpensePayload,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      inMemoryExpenses.unshift(mockExpense);
-      return res.status(201).json({ success: true, data: mockExpense });
-    }
+    const localExpense = {
+      _id: 'local_' + Date.now(),
+      ...newExpensePayload,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    inMemoryExpenses.unshift(localExpense);
+    return res.status(201).json({ success: true, data: localExpense });
   } catch (err) {
     console.error('Error parsing expense:', err);
     res.status(500).json({ success: false, error: 'Failed to process expense input.' });
@@ -247,26 +220,8 @@ app.post('/api/parse-expense', async (req, res) => {
 app.get('/api/expenses', async (req, res) => {
   try {
     const { month, year } = req.query;
-    const now = new Date();
-    const targetMonth = month ? parseInt(month) : (now.getMonth() + 1);
-    const targetYear = year ? parseInt(year) : now.getFullYear();
-
-    const startDate = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0);
-    const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
-
-    if (isMongoConnected) {
-      const expenses = await Expense.find({
-        date: { $gte: startDate, $lte: endDate }
-      }).sort({ date: -1 });
-      return res.json({ success: true, count: expenses.length, data: expenses });
-    } else {
-      // In-Memory Filtering
-      const filtered = inMemoryExpenses.filter(e => {
-        const d = new Date(e.date);
-        return d >= startDate && d <= endDate;
-      }).sort((a, b) => new Date(b.date) - new Date(a.date));
-      return res.json({ success: true, count: filtered.length, data: filtered });
-    }
+    const expenses = [...inMemoryExpenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+    return res.json({ success: true, count: expenses.length, data: expenses });
   } catch (err) {
     console.error('Error fetching expenses:', err);
     res.status(500).json({ success: false, error: 'Failed to retrieve expenses.' });
@@ -277,20 +232,12 @@ app.get('/api/expenses', async (req, res) => {
 app.delete('/api/expenses/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    if (isMongoConnected) {
-      const deleted = await Expense.findByIdAndDelete(id);
-      if (!deleted) {
-        return res.status(404).json({ success: false, error: 'Transaction not found.' });
-      }
-      return res.json({ success: true, message: 'Expense deleted successfully.' });
-    } else {
-      const idx = inMemoryExpenses.findIndex(e => e._id === id);
-      if (idx === -1) {
-        return res.status(404).json({ success: false, error: 'Transaction not found.' });
-      }
-      inMemoryExpenses.splice(idx, 1);
-      return res.json({ success: true, message: 'Expense deleted successfully.' });
+    const originalLength = inMemoryExpenses.length;
+    inMemoryExpenses = inMemoryExpenses.filter((expense) => expense._id !== id);
+    if (inMemoryExpenses.length === originalLength) {
+      return res.status(404).json({ success: false, error: 'Transaction not found.' });
     }
+    return res.json({ success: true, message: 'Expense deleted successfully.' });
   } catch (err) {
     console.error('Error deleting expense:', err);
     res.status(500).json({ success: false, error: 'Failed to delete expense.' });
@@ -355,7 +302,6 @@ app.post('/api/text-to-speech', async (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
-    mongoConnected: isMongoConnected,
     ollamaHost: OLLAMA_HOST,
     ollamaModel: OLLAMA_MODEL
   });

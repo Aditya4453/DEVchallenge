@@ -16,7 +16,7 @@ Frontend package (frontend/package.json):
 - Build tooling: Vite, @vitejs/plugin-react, Tailwind CSS, PostCSS, Autoprefixer
 
 Backend package (backend/package.json):
-- express, cors, mongoose, dotenv, axios, multer
+- express, cors, dotenv, axios, multer
 - @google/genai
 - elevenlabs, @elevenlabs/elevenlabs-js
 
@@ -25,20 +25,19 @@ Backend package (backend/package.json):
 
 Backend:
 - backend/server.js is the Express entry point. It serves frontend/dist when
-  available, enables CORS and JSON parsing, connects to MongoDB, and listens on
-  PORT (default 5000).
+  available, enables CORS and JSON parsing, and listens on PORT (default 5000).
 - POST /api/parse-expense
   Accepts text, month, and year; parses the transaction; assigns the requested
-  month/year date; then persists it in MongoDB or in-memory storage.
+  month/year date; then stores it in the backend in-memory array.
 - GET /api/expenses?month=MM&year=YYYY
   Returns month-bounded transactions sorted newest first.
 - DELETE /api/expenses/:id
-  Deletes a MongoDB document or in-memory transaction.
+  Deletes a local in-memory transaction.
 - POST /api/text-to-speech
   Legacy ElevenLabs TTS endpoint. It returns MP3 audio when configured and a
   fallback response otherwise. Current React UI has TTS disabled.
 - GET /api/health
-  Reports server status, MongoDB state, Ollama host, and Ollama model.
+  Reports server status, Ollama host, and Ollama model.
 - parseWithOllama sends /api/generate to Ollama with temperature 0 and a strict
   JSON schema containing amount, category, merchant, and type. It sanitizes the
   amount and normalizes missing values.
@@ -48,9 +47,8 @@ Backend:
   fallbackParseTransaction and should be aligned if that path is exercised.
 - parseWithGemini is not implemented in the current backend, despite the
   @google/genai dependency. There is no active Gemini fallback path.
-- MongoDB model: backend/models/Expense.js, with amount, category, merchant,
-  type, rawInput, date, and timestamps.
-- Storage fallback: inMemoryExpenses is used when MongoDB connection fails.
+- Storage: inMemoryExpenses stores transactions for the backend process lifetime.
+  Each record uses a local_ timestamp-based string ID.
 
 Frontend:
 - frontend/src/App.jsx owns month/year selection, expense loading, natural
@@ -80,7 +78,6 @@ Backend keys from backend/.env.example:
 - PORT
 - OLLAMA_HOST
 - OLLAMA_MODEL
-- MONGODB_URI
 - SENTRY_DSN
 - ELEVENLABS_API_KEY
 - ELEVENLABS_VOICE_ID
@@ -92,8 +89,8 @@ Typical setup:
 - Backend: cd backend; npm install; npm start
 - Frontend development: cd frontend; npm install; npm run dev
 - Production frontend: cd frontend; npm run build; backend serves frontend/dist
-- Ollama is expected at OLLAMA_HOST with the configured model. MongoDB is
-  optional because in-memory storage is available.
+- Ollama is expected at OLLAMA_HOST with the configured model. Transactions are
+  held in backend memory and mirrored to browser localStorage by the frontend.
 
 4. FEATURES AND EDGE CASES
 ---------------------------
@@ -105,13 +102,10 @@ Typical setup:
   Ollama result sanitization. The heuristic parser defaults to 100 when no
   numeric amount is found.
 - Ollama category/type values are constrained by a strict JSON schema and
-  normalized after parsing. The schema includes Health & Wellness, while the
-  Mongoose category enum currently does not; this should be aligned before
-  using that category.
+  normalized after parsing.
 - Parser fallback is intended to keep offline operation working through
   keyword-based category, income, merchant, and amount detection.
-- Month filtering uses inclusive start/end dates and works with either
-  MongoDB or in-memory storage.
+- Month filtering uses transaction dates and is applied by the frontend.
 - Export filenames include the active category filter, month, year, and
   transaction sort (CSV), or category filter/month/year and image format
   (chart). Empty exports are disabled.
