@@ -32,7 +32,7 @@ export default function HeroInput({ onSubmit, isLoading }) {
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.05em] font-semibold text-neutral-400">
               <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-              Ollama Gemma 2 Local Model
+              Ollama LLaMA 3.2 Local Model
             </span>
             <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded">
               <Mic className="w-3 h-3" /> Natural Language Input
