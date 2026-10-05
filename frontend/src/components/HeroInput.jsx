@@ -61,7 +61,7 @@ export default function HeroInput({ onSubmit, isLoading }) {
                 type="text" 
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Type anything... e.g., 'aaj 450 CCD coffee pe spent kiye' or 'got 25000 salary'" 
+                placeholder="Enter your expense or income... e.g., 'aaj 450 CCD coffee' or 'got 25000 salary'"  
                 className="w-full bg-transparent text-sm sm:text-base text-[#FCFBF9] placeholder-neutral-500 focus:outline-none py-2.5 font-sans"
                 disabled={isLoading}
                 autoComplete="off"
