@@ -53,7 +53,14 @@ PROJECT_INFO.txt         Detailed architecture notes
 
 ## 1. Install
 
-From the project root:
+First, clone the repository and navigate into it:
+
+```bash
+git clone https://github.com/Aditya4453/DEVchallenge.git
+cd DEVchallenge
+```
+
+From the project root, install dependencies for both backend and frontend:
 
 ```bash
 cd backend
@@ -70,7 +77,7 @@ Create `backend/.env` from `backend/.env.example`:
 ```env
 PORT=5000
 OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=gemma2:2b
+OLLAMA_MODEL=llama3.2
 SENTRY_DSN=
 
 # Optional legacy TTS settings; not used by the current React UI
@@ -86,7 +93,7 @@ connection string.
 Install Ollama, start the Ollama service, and pull the configured model:
 
 ```bash
-ollama pull gemma2:2b
+ollama pull llama3.2
 ```
 
 The backend expects Ollama at `http://localhost:11434` by default. To use a
@@ -212,7 +219,7 @@ Check that Ollama is running and the model exists:
 
 ```bash
 ollama list
-ollama pull gemma2:2b
+ollama pull llama3.2
 ```
 
 Basic entries can still be parsed by the backend fallback.
