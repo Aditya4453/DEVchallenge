@@ -176,6 +176,8 @@ app.post('/api/parse-expense', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Text prompt is required.' });
     }
 
+    console.log(`[INFO] Received parsing request for text: "${text}" (Target: ${month}/${year})`);
+
     // Call Ollama or Fallback Parser
     const parsedData = await parseWithOllama(text);
 
