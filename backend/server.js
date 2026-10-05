@@ -27,7 +27,7 @@ if (fs.existsSync(frontendDistPath)) {
 
 const PORT = process.env.PORT || 5000;
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma2:2b';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2';
 let inMemoryExpenses = [];
 
 // Heuristic Fallback Parser for local offline execution when Ollama is unavailable
@@ -79,7 +79,7 @@ function fallbackParseTransaction(text) {
   return { amount, category, merchant, type };
 }
 
-// AI Parsing logic using Ollama gemma2:2b
+// AI Parsing logic using Ollama llama3.2
 
 async function parseWithOllama(text) {
   // 1. Enforce exact schema structure and keys
